@@ -2,6 +2,7 @@ const core = require('@actions/core');
 const github = require('@actions/github');
 const parseConfig = require('./parseConfig');
 const validatePrTitle = require('./validatePrTitle');
+import {inspect} from 'util'
 
 module.exports = async function run() {
   try {
@@ -19,6 +20,9 @@ module.exports = async function run() {
     const client = github.getOctokit(process.env.GITHUB_TOKEN, {
       baseUrl: githubBaseUrl
     });
+
+    // core.info(`github.context ${inspect(github.context)}`);
+    throw new Error(`github.context ${inspect(github.context)}`);
 
     const contextPullRequest = github.context.payload.pull_request;
     if (!contextPullRequest) {
