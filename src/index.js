@@ -2,6 +2,7 @@ const core = require('@actions/core');
 const github = require('@actions/github');
 const parseConfig = require('./parseConfig');
 const validatePrTitle = require('./validatePrTitle');
+const util = require('util');
 
 module.exports = async function run() {
   try {
@@ -20,15 +21,43 @@ module.exports = async function run() {
       baseUrl: githubBaseUrl
     });
 
-    const contextPullRequest = github.context.payload.pull_request;
-    if (!contextPullRequest) {
+    function getParamsFromContext(context) {
+      core.info(`github.context ${util.inspect(context)}`);
+
+      const contextPullRequest = context.payload.pull_request;
+      if (contextPullRequest) {
+        const owner = contextPullRequest.base.user.login;
+        const repo = contextPullRequest.base.repo.name;
+        const pull_number = contextPullRequest.number;
+    
+        return {
+          owner,
+          repo,
+          pull_number
+        };
+      }
+      
+      // hack out the Merge Queue information that matches a Pull Request
+      if (context.eventName === 'push' && context.ref) {
+        const owner = context.payload.name;
+        const repo = context.payload.organization;
+        // ref looks like this on Merge Queue pulls refs/heads/gh-readonly-queue/main/pr-2807-e526248bb10134bda36b4234c1df5073a4253aa2
+        // we can get the PR number from the there which is 2807 in this case.
+        const pull_number = context.ref.match(/pr-(\d+)/)[1];
+
+        return {
+          owner,
+          repo,
+          pull_number
+        };
+      }
+
       throw new Error(
         "This action can only be invoked in `pull_request_target` or `pull_request` events. Otherwise the pull request can't be inferred."
       );
-    }
-
-    const owner = contextPullRequest.base.user.login;
-    const repo = contextPullRequest.base.repo.name;
+    };
+    
+    const { owner, repo, pull_number } = getParamsFromContext(github.context);
 
     // The pull request info on the context isn't up to date. When
     // the user updates the title and re-runs the workflow, it would
@@ -37,7 +66,7 @@ module.exports = async function run() {
     const {data: pullRequest} = await client.pulls.get({
       owner,
       repo,
-      pull_number: contextPullRequest.number
+      pull_number: pull_number
     });
 
     // Pull requests that start with "[WIP] " are excluded from the check.
@@ -63,7 +92,7 @@ module.exports = async function run() {
             {
               owner,
               repo,
-              pull_number: contextPullRequest.number
+              pull_number: pull_number
             }
           )) {
             commits.push(...response.data);
@@ -131,6 +160,7 @@ module.exports = async function run() {
       throw validationError;
     }
   } catch (error) {
-    core.setFailed(error.message);
+    core.info(`Error: ${error.message}`);
+    // core.setFailed(error.message);
   }
 };
