@@ -2,6 +2,7 @@ const core = require('@actions/core');
 const github = require('@actions/github');
 const parseConfig = require('./parseConfig');
 const validatePrTitle = require('./validatePrTitle');
+const util = require('util');
 
 module.exports = async function run() {
   try {
@@ -20,11 +21,15 @@ module.exports = async function run() {
       baseUrl: githubBaseUrl
     });
 
+    core.info(`github.context ${util.inspect(github.context)}`);
+
     const contextPullRequest = github.context.payload.pull_request;
     if (!contextPullRequest) {
-      throw new Error(
-        "This action can only be invoked in `pull_request_target` or `pull_request` events. Otherwise the pull request can't be inferred."
-      );
+      core.info("Skipping: This action can only be invoked in `pull_request_target` or `pull_request` events. Otherwise the pull request can't be inferred.");
+      return;
+      // throw new Error(
+      //   "This action can only be invoked in `pull_request_target` or `pull_request` events. Otherwise the pull request can't be inferred."
+      // );
     }
 
     const owner = contextPullRequest.base.user.login;
